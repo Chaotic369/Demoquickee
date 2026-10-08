@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Quick Launcher</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #ececec;
+  --dim: rgba(200, 200, 200, 0.55);
+  --faint: rgba(255, 255, 255, 0.06);
+  --acc: #ffc46b;
+  --bg: #09090c;
+  --panel: #111115;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Bricolage Grotesque', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select { font: inherit; color: var(--ink); outline: none; }
+
+/* ───── Trigger Handle & Controls ───── */
+#fab {
+  position: fixed;
+  z-index: 45;
+  width: var(--trig-w, 6px);
+  height: var(--trig-h, 90px);
+  border-radius: 4px 0 0 4px;
+  touch-action: none;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.35);
+  transition: width 0.18s, background 0.2s;
+  cursor: grab;
+}
+#fab:hover, #fab:active, #fab.open {
+  width: calc(var(--trig-w, 6px) + 6px);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.fbtn {
+  position: fixed;
+  z-index: 45;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--ink);
+  background: rgba(18, 18, 18, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.7);
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s;
+}
+.fbtn.open { opacity: 1; pointer-events: auto; transform: scale(1); }
+.fbtn.open:hover { transform: scale(1.15); z-index: 55; }
+.fbtn:active { transform: scale(0.95); }
+.fbtn.on { color: var(--acc); box-shadow: 0 0 0 1.5px var(--acc); }
+#fabAdd { display: none; }
+#fabAdd.show { display: grid; }
+
+.trig-handle {
+  display: none;
+  position: absolute;
+  right: 100%;
+  z-index: 48;
+  touch-action: none;
+  user-select: none;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.trig-handle.end-cap {
+  width: 22px;
+  height: 24px;
+  background: #3a3842;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  clip-path: polygon(0% 25%, 65% 25%, 100% 50%, 65% 75%, 0% 75%);
+  cursor: ns-resize;
+}
+.trig-handle.top-cap { top: -12px; }
+.trig-handle.bot-cap { bottom: -12px; }
+.trig-handle.width-tab {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  cursor: ew-resize;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.edit #fab .trig-handle { display: flex; }
+
+.dt-ring {
+  position: fixed;
+  z-index: 999;
+  width: var(--ring-sz, 52px);
+  height: var(--ring-sz, 52px);
+  border-width: var(--ring-th, 2.5px);
+  border-style: solid;
+  border-color: var(--ring-col, rgba(255, 255, 255, 0.38));
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  display: none;
+  background: transparent !important;
+}
+
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 38;
+  display: none;
+}
+#scrim.on { display: block; }
+
+/* ───── Popup ───── */
+#pop {
+  --icon: 46px;
+  --rad: 28;
+  --cols: 4;
+  --cgap: 8px;
+  --rgap: 10px;
+  --pad: 12px;
+  --lbl: 9.5px;
+  --glass: 0.85;
+  --pop-rad: 26px;
+  --pop-blur: 32px;
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--pop-rad);
+  background: var(--pop-bg, rgba(10, 10, 14, var(--glass)));
+  backdrop-filter: blur(var(--pop-blur));
+  -webkit-backdrop-filter: blur(var(--pop-blur));
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  transform: scale(0.94) translateX(12px);
+  pointer-events: none;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#pop.solid-black { background: #000 !important; backdrop-filter: none !important; }
+#pop.open { opacity: 1; transform: none; pointer-events: auto; }
+
+.pbody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--pad);
+  scrollbar-width: none;
+}
+.pbody::-webkit-scrollbar { display: none; }
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  column-gap: var(--cgap);
+  row-gap: var(--rgap);
+  width: 100%;
+  align-items: start;
+}
+.grid-cell {
+  position: relative;
+  width: 100%;
+  min-height: calc(var(--icon) + 20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+.cell-add {
+  display: none;
+  width: var(--icon);
+  height: var(--icon);
+  aspect-ratio: 1;
+  border-radius: calc(var(--icon) * var(--rad) / 100);
+  place-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 16px;
+  cursor: pointer;
+  border: 1.5px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.15s;
+}
+.cell-add:hover { color: var(--acc); border-color: var(--acc); background: rgba(255, 196, 107, 0.1); }
+.edit .grid-cell.empty-slot .cell-add { display: grid; }
+
+.it {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  width: 100%;
+  cursor: pointer;
+}
+.it .ic {
+  position: relative;
+  width: var(--icon);
+  height: var(--icon);
+  aspect-ratio: 1;
+  border-radius: calc(var(--icon) * var(--rad) / 100);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: calc(var(--icon) * 0.44);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  transition: transform 0.18s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.18s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.it .ic img { width: 100%; height: 100%; object-fit: cover; }
+.it .ic b { font-weight: 700; font-size: calc(var(--icon) * 0.46); }
+.it:active .ic { transform: scale(0.95); }
+.it .lb {
+  max-width: 100%;
+  font-size: var(--lbl);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  font-weight: 500;
+  color: rgba(246, 239, 228, 0.9);
+}
+.nolbl .it .lb { display: none; }
+.it.lift { opacity: 0.25; }
+.it .x {
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: calc(50% - var(--icon) / 2 - 6px);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e5534b;
+  color: #fff;
+  font-size: 11px;
+  place-items: center;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid #1b1629;
+  cursor: pointer;
+}
+.edit .it .x { display: grid; }
+.it.drag-over .ic {
+  transform: scale(1.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.rz {
+  position: fixed;
+  width: 32px;
+  height: 32px;
+  touch-action: none;
+  cursor: nesw-resize;
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.rz::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-bottom: 3px solid var(--acc);
+  border-left: 3px solid var(--acc);
+  border-bottom-left-radius: 12px;
+}
+body.edge-left .rz::after {
+  border-left: none;
+  border-right: 3px solid var(--acc);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 12px;
+}
+
+.pop-bottom-bar {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: ns-resize;
+  z-index: 50;
+}
+.pop-bottom-bar::after {
+  content: "";
+  width: 32px;
+  height: 4.5px;
+  border-radius: 3px;
+  background: var(--acc);
+}
+.edit #pop .pop-bottom-bar { display: flex; }
+
+.pop-scroll-arrow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  z-index: 45;
+  pointer-events: none;
+}
+.pop-scroll-arrow.arr-top { top: 4px; }
+.pop-scroll-arrow.arr-bot { bottom: 4px; }
+.pop-scroll-arrow.visible { display: flex; }
+.pop-scroll-arrow.active { color: var(--acc); transform: translateX(-50%) scale(1.2); }
+
+/* ───── Desktop Base Canvas ───── */
+#desktop {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+#desktop h1 {
+  font-size: 32px;
+  margin-bottom: 8px;
+  letter-spacing: -1px;
+}
+#desktop p {
+  color: var(--dim);
+  max-width: 420px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+#openStudioBtn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.15s;
+}
+#openStudioBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ───── Studio Panel ───── */
+#studio {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  background: var(--bg);
+  display: none;
+  flex-direction: column;
+}
+#studio.on { display: flex; }
+.stabs {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  scrollbar-width: none;
+}
+.stabs::-webkit-scrollbar { display: none; }
+.stabs button {
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.stabs button.on { background: rgba(255, 196, 107, 0.15); color: var(--acc); }
+
+.stbody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.set-card {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.set-hdr {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sg { margin-bottom: 14px; }
+.sg .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.sg .row span:last-child { color: var(--acc); font-weight: 700; }
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-runnable-track { height: 5px; border-radius: 6px; background: rgba(255, 255, 255, 0.15); }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--acc);
+  margin-top: -6.5px;
+}
+
+.sw {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin: 12px 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tg {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  position: relative;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.tg::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+.tg.on { background: var(--acc); }
+.tg.on::after { transform: translateX(20px); background: #201402; }
+
+.sbtn, .bigbtn {
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.sbtn { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.08); }
+.sbtn:hover { background: rgba(255, 255, 255, 0.14); }
+.bigbtn { background: var(--acc); color: #201402; }
+
+.res {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 6px;
+}
+.res .ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 16px;
+}
+.res .tx { flex: 1; min-width: 0; }
+.res .tx b { display: block; font-size: 13px; }
+.res .tx small { display: block; font-size: 11px; color: var(--dim); margin-top: 2px; }
+.res .pin { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--dim); }
+.res .pin:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+.res .pin.dl { color: #ff7b72; }
+
+/* ───── Dialogs ───── */
+.dlgw {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dc {
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 24px;
+  background: #141419;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 22px;
+}
+.dc h3 { font-size: 18px; margin-bottom: 16px; }
+.dc label { display: block; font-size: 11.5px; color: var(--dim); margin: 12px 0 6px; font-weight: 600; text-transform: uppercase; }
+.dc input[type=text], .dc select {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 14px;
+  color: var(--ink);
+}
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  color: var(--dim);
+}
+.seg button.on { background: var(--acc); color: #1c1304; font-weight: 700; }
+.pick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pick button {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+}
+.pick button.on { border: 2px solid var(--acc); color: var(--acc); }
+.acts { display: flex; gap: 10px; margin-top: 20px; }
+.acts .sp { flex: 1; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  transform: translate(-50%, 14px);
+  z-index: 999;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: #fff;
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<div id="desktop">
+  <h1>Quick Launcher</h1>
+  <p>Trigger is anchored to the screen edge. Pull or hover the handle to deploy the pop-up launcher.</p>
+  <button id="openStudioBtn"><i class="fa-solid fa-sliders"></i> Open Settings Panel</button>
+</div>
+
+<div id="scrim"></div>
+<button id="fabAdd" class="fbtn" title="Add shortcut"><i class="fa-solid fa-plus"></i></button>
+<button id="fabEdit" class="fbtn" title="Edit grid"><i class="fa-solid fa-pen"></i></button>
+<button id="fabSet" class="fbtn" title="Settings"><i class="fa-solid fa-gear"></i></button>
+
+<div id="fab">
+  <div class="trig-handle end-cap top-cap" id="trigRzTop"></div>
+  <div class="trig-handle width-tab" id="trigRzW">< ></div>
+  <div class="trig-handle end-cap bot-cap" id="trigRzBottom"></div>
+</div>
+
+<div id="pop">
+  <div class="pop-scroll-arrow arr-top" id="popScrollUp"><i class="fa-solid fa-chevron-up"></i></div>
+  <div class="pbody" id="pbody">
+    <div id="grid"></div>
+  </div>
+  <div class="pop-scroll-arrow arr-bot" id="popScrollDown"><i class="fa-solid fa-chevron-down"></i></div>
+  <div class="pop-bottom-bar" id="popBottomBar"></div>
+</div>
+
+<div class="rz" id="rz"></div>
+
+<!-- Settings Studio -->
+<div id="studio">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 4px;">
+    <h2 style="font-size:18px">Configuration Studio</h2>
+    <button class="sbtn" id="stDoneBtn"><i class="fa-solid fa-check"></i> Exit Settings</button>
+  </div>
+  <div class="stabs" id="stTabs">
+    <button data-t="general" class="on">General</button>
+    <button data-t="items">Shortcuts</button>
+    <button data-t="grid">Grid Dimensions</button>
+    <button data-t="icons">Icon Styles</button>
+    <button data-t="popup">Popup Styling</button>
+    <button data-t="trigger">Edge Trigger</button>
+    <button data-t="ring">Selection Ring</button>
+  </div>
+  <div class="stbody" id="stBody"></div>
+</div>
+
+<!-- Add / Edit Item Dialog -->
+<div class="dlgw" id="dlg">
+  <div class="dc">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 id="dT" style="margin:0">Shortcut Configuration</h3>
+      <button id="dBatchBtn" type="button" class="sbtn" style="padding:4px 10px;font-size:11px"><i class="fa-solid fa-layer-group"></i> Add Batch</button>
+    </div>
+    <label>Type</label>
+    <div class="seg" id="dType"></div>
+    <label>Label</label>
+    <input type="text" id="dName" placeholder="Shortcut title">
+    <label id="dTL">Action / Target</label>
+    <div id="dAppBox" style="display:none;flex-direction:column;gap:8px">
+      <select id="dAppSel"></select>
+    </div>
+    <input type="text" id="dTarget" placeholder="URL, URI, or command">
+    <select id="dSys" style="display:none"></select>
+    
+    <label style="margin-top:14px">Icon Representation</label>
+    <div id="dIcons" class="pick"></div>
+
+    <div class="acts">
+      <button class="sbtn" id="dDel" style="color:#ff7b72;display:none">Remove</button>
+      <span class="sp"></span>
+      <button class="sbtn" id="dCancel">Cancel</button>
+      <button class="bigbtn" id="dSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Multi-Batch Add Dialog -->
+<div class="dlgw" id="batchDlg">
+  <div class="dc">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin:0">Add Default Applications</h3>
+      <span id="batchCount" style="color:var(--acc);font-size:12px;font-weight:700">0 selected</span>
+    </div>
+    <div id="batchAppList" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+    <div class="acts">
+      <button class="sbtn" id="batchCancel">Cancel</button>
+      <span class="sp"></span>
+      <button class="bigbtn" id="batchAddBtn">Import Selected</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function() {
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&','<':'<','>':'>','"':'"'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(v, b));
+
+const KEY = 'quick_launcher_app_v2';
+const phone = document.body;
+const pop = $('#pop'), fab = $('#fab'), fabEdit = $('#fabEdit'), fabSet = $('#fabSet'), fabAdd = $('#fabAdd'), grid = $('#grid'), pbody = $('#pbody');
+
+/* ───────── Preset Catalog & Engine Metadata ───────── */
+const TYPES = {
+  app: { label: 'Application', color: '#5b8def', icon: 'fa-solid fa-cube' },
+  web: { label: 'Web URL', color: '#4aa3ff', icon: 'fa-solid fa-globe' },
+  system: { label: 'System Tool', color: '#6c63ff', icon: 'fa-solid fa-sliders' }
+};
+
+const INSTALLED = [
+  { n: 'Browser', v: 'https://google.com', i: 'fa-brands fa-chrome', c: '#e8a63a' },
+  { n: 'Code Editor', v: 'code://open', i: 'fa-solid fa-code', c: '#34b36b' },
+  { n: 'Terminal', v: 'term://run', i: 'fa-solid fa-terminal', c: '#2a2438' },
+  { n: 'Files', v: 'file:///home', i: 'fa-solid fa-folder-open', c: '#4f86d9' },
+  { n: 'Music', v: 'music://library', i: 'fa-solid fa-music', c: '#e24d9b' },
+  { n: 'Settings', v: 'sys://settings', i: 'fa-solid fa-gear', c: '#7a8699' }
+];
+
+const SYS = {
+  reload: { n: 'Reload', i: 'fa-solid fa-rotate', c: '#4d9a86', run: () => location.reload() },
+  fs: { n: 'Fullscreen', i: 'fa-solid fa-expand', c: '#3d8f9e', run: () => toggleFullscreen() },
+  dark: { n: 'Darken Canvas', i: 'fa-solid fa-moon', c: '#3a3f66', tog: 1 },
+  haptic: { n: 'Haptics', i: 'fa-solid fa-bell', c: '#c9843a', tog: 1 }
+};
+
+const ICONS = [
+  'fa-solid fa-cube', 'fa-solid fa-gear', 'fa-solid fa-globe', 'fa-solid fa-terminal',
+  'fa-solid fa-folder-open', 'fa-solid fa-code', 'fa-solid fa-music', 'fa-solid fa-expand',
+  'fa-solid fa-rotate', 'fa-solid fa-moon', 'fa-solid fa-sliders'
+];
+
+const S_DEF = {
+  icon: 46, radius: 28, cols: 4, rows: 5, cgap: 8, rgap: 10, pad: 12, lbl: 9.5,
+  showLbl: true, w: 280, h: 420, glass: 80, popRad: 26, blur: 32, trigH: 90, trigW: 6,
+  trigY: 50, trigEdge: 'right', haptic: true, ringSize: 48, ringThick: 2.5, ringOpacity: 40, triggerEnabled: true
+};
+
+const CTRL = [
+  ['icon', 'Icon size', 30, 78, 1, 'px'],
+  ['radius', 'Icon roundness', 0, 50, 1, '%'],
+  ['cols', 'Columns', 2, 7, 1, ''],
+  ['rows', 'Rows', 2, 10, 1, ''],
+  ['cgap', 'Column gap', 0, 34, 1, 'px'],
+  ['rgap', 'Row gap', 0, 38, 1, 'px'],
+  ['pad', 'Padding', 4, 34, 1, 'px'],
+  ['lbl', 'Label size', 7, 15, 0.5, 'px'],
+  ['w', 'Popup width', 220, 600, 1, 'px'],
+  ['h', 'Popup height', 200, 800, 1, 'px'],
+  ['glass', 'Opacity', 30, 100, 1, '%'],
+  ['popRad', 'Corner radius', 0, 40, 1, 'px'],
+  ['blur', 'Blur', 0, 40, 1, 'px'],
+  ['trigH', 'Trigger length', 40, 260, 2, 'px'],
+  ['trigW', 'Trigger width', 3, 20, 1, 'px'],
+  ['trigY', 'Trigger Y position', 10, 90, 1, '%'],
+  ['ringSize', 'Pointer ring size', 30, 90, 1, 'px'],
+  ['ringThick', 'Pointer ring border', 1, 8, 0.5, 'px'],
+  ['ringOpacity', 'Pointer ring opacity', 10, 100, 2, '%']
+];
+
+const DEF_SHORTCUTS = [
+  { t: 'web', n: 'Browser', v: 'https://google.com', i: 'fa-brands fa-chrome', c: '#e8a63a', slot: 0 },
+  { t: 'app', n: 'Code Editor', v: 'code://open', i: 'fa-solid fa-code', c: '#34b36b', slot: 1 },
+  { t: 'app', n: 'Terminal', v: 'term://run', i: 'fa-solid fa-terminal', c: '#2a2438', slot: 2 },
+  { t: 'app', n: 'Files', v: 'file:///home', i: 'fa-solid fa-folder-open', c: '#4f86d9', slot: 3 },
+  { t: 'system', n: 'Fullscreen', v: 'fs', i: 'fa-solid fa-expand', c: '#3d8f9e', slot: 4 },
+  { t: 'system', n: 'Reload', v: 'reload', i: 'fa-solid fa-rotate', c: '#4d9a86', slot: 5 }
+];
+
+let uidN = 0;
+const uid = () => 's' + Date.now().toString(36) + (uidN++);
+
+function loadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY));
+    if (raw && raw.items) {
+      return { ...raw, set: { ...S_DEF, ...raw.set }, items: raw.items };
+    }
+  } catch(e) {}
+  return { items: DEF_SHORTCUTS.map(x => ({ id: uid(), ...x })), set: { ...S_DEF }, tog: { dark: 0, haptic: 1 } };
+}
+
+let st = loadState();
+function saveState() {
+  try { localStorage.setItem(KEY, JSON.stringify(st)); } catch(e) {}
+}
+
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(el.t);
+  el.t = setTimeout(() => el.classList.remove('on'), 1800);
+}
+
+function haptic() {
+  if (st.set.haptic && navigator.vibrate) navigator.vibrate(12);
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen().catch(()=>{});
+}
+
+/* ───────── Presentation Sync ───────── */
+function applySet() {
+  const s = st.set;
+  const v = (k, val) => pop.style.setProperty(k, val);
+  const isFullBlack = s.glass >= 100;
+  
+  v('--icon', s.icon + 'px');
+  v('--rad', s.radius);
+  v('--cols', s.cols);
+  v('--cgap', s.cgap + 'px');
+  v('--rgap', s.rgap + 'px');
+  v('--pad', s.pad + 'px');
+  v('--lbl', s.lbl + 'px');
+  v('--pop-rad', (s.popRad ?? 26) + 'px');
+  v('--pop-blur', (isFullBlack ? 0 : (s.blur ?? 32)) + 'px');
+  v('--pop-bg', isFullBlack ? '#000000' : `rgba(10, 10, 14, ${s.glass / 100})`);
+  pop.classList.toggle('solid-black', isFullBlack);
+
+  document.body.classList.toggle('edge-left', s.trigEdge === 'left');
+  document.body.style.setProperty('--trig-w', (s.trigW || 6) + 'px');
+  document.body.style.setProperty('--trig-h', (s.trigH || 90) + 'px');
+  document.body.style.setProperty('--ring-sz', (s.ringSize || 48) + 'px');
+  document.body.style.setProperty('--ring-th', (s.ringThick || 2.5) + 'px');
+  document.body.style.setProperty('--ring-col', `rgba(255, 255, 255, ${(s.ringOpacity ?? 40) / 100})`);
+  
+  pop.classList.toggle('nolbl', !s.showLbl);
+  pop.style.width = clamp(s.w, 180, window.innerWidth - 16) + 'px';
+  pop.style.height = clamp(s.h, 180, window.innerHeight - 30) + 'px';
+}
+
+function positionFab() {
+  const s = st.set;
+  const th = s.trigH || 90;
+  const y = clamp(window.innerHeight * (s.trigY / 100) - th / 2, 20, window.innerHeight - th - 20);
+  const isLeft = s.trigEdge === 'left';
+  
+  fab.style.left = isLeft ? '0px' : (window.innerWidth - fab.offsetWidth) + 'px';
+  fab.style.borderRadius = isLeft ? '0 4px 4px 0' : '4px 0 0 4px';
+  fab.style.top = y + 'px';
+
+  const btnX = isLeft ? 10 : window.innerWidth - 42;
+  const baseT = clamp(y - 40, 10, window.innerHeight - 50);
+  fabSet.style.left = btnX + 'px'; fabSet.style.top = baseT + 'px';
+  fabEdit.style.left = (btnX + (isLeft ? 36 : -36)) + 'px'; fabEdit.style.top = baseT + 'px';
+  fabAdd.style.left = (btnX + (isLeft ? 72 : -72)) + 'px'; fabAdd.style.top = baseT + 'px';
+}
+
+function placePop() {
+  const isLeft = st.set.trigEdge === 'left';
+  const h = pop.offsetHeight;
+  const y = clamp(fab.offsetTop + (fab.offsetHeight / 2) - (h / 2), 16, window.innerHeight - h - 16);
+  pop.style.top = y + 'px';
+  pop.style.left = isLeft ? '0px' : 'auto';
+  pop.style.right = isLeft ? 'auto' : '0px';
+
+  const rz = $('#rz');
+  if (editMode && pop.classList.contains('open')) {
+    rz.style.display = 'flex';
+    rz.style.top = (pop.offsetTop + pop.offsetHeight - 32) + 'px';
+    rz.style.left = isLeft ? (pop.offsetLeft + pop.offsetWidth - 32) + 'px' : pop.offsetLeft + 'px';
+  } else {
+    rz.style.display = 'none';
+  }
+}
+
+function openPop() {
+  applySet();
+  renderGrid();
+  pop.classList.add('open');
+  fab.classList.add('open');
+  fabEdit.classList.add('open');
+  fabSet.classList.add('open');
+  if (editMode) fabAdd.classList.add('open', 'show');
+  $('#scrim').classList.add('on');
+  placePop();
+}
+
+function closePop() {
+  pop.classList.remove('open');
+  fab.classList.remove('open');
+  fabEdit.classList.remove('open', 'on');
+  fabSet.classList.remove('open');
+  fabAdd.classList.remove('open', 'show');
+  $('#scrim').classList.remove('on');
+  editMode = false;
+  pop.classList.remove('edit');
+  $('#rz').style.display = 'none';
+}
+
+$('#scrim').onclick = closePop;
+
+/* ───────── Grid Rendering ───────── */
+function renderGrid() {
+  const cols = Math.max(1, parseInt(st.set.cols) || 4);
+  const rows = Math.max(1, parseInt(st.set.rows) || 5);
+  const bySlot = new Map();
+  let maxSlot = -1;
+
+  st.items.forEach(it => {
+    if (typeof it.slot === 'number') {
+      bySlot.set(it.slot, it);
+      if (it.slot > maxSlot) maxSlot = it.slot;
+    }
+  });
+
+  const total = Math.max(cols * rows, Math.ceil((maxSlot + 2) / cols) * cols);
+  let html = '';
+
+  for (let s = 0; s < total; s++) {
+    const it = bySlot.get(s);
+    if (it) {
+      html += `
+        <div class="grid-cell" data-slot="${s}">
+          <div class="it" data-id="${it.id}">
+            <div class="ic" style="background:${it.c || '#5b8def'}"><i class="${esc(it.i)}"></i></div>
+            <div class="lb">${esc(it.n)}</div>
+            <button class="x"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>`;
+    } else {
+      html += `
+        <div class="grid-cell empty-slot" data-slot="${s}">
+          <div class="cell-add"><i class="fa-solid fa-plus"></i></div>
+        </div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+/* ───────── Gesture Trigger System ───────── */
+const dtRing = document.createElement('div');
+dtRing.className = 'dt-ring';
+document.body.appendChild(dtRing);
+
+let fbDrag = false, lastHoveredItem = null;
+
+fab.addEventListener('pointerdown', e => {
+  fbDrag = true;
+  fab.setPointerCapture(e.pointerId);
+  if (!pop.classList.contains('open')) openPop();
+  dtRing.style.display = 'block';
+  dtRing.style.left = e.clientX + 'px';
+  dtRing.style.top = e.clientY + 'px';
+});
+
+fab.addEventListener('pointermove', e => {
+  if (!fbDrag) return;
+  dtRing.style.left = e.clientX + 'px';
+  dtRing.style.top = e.clientY + 'px';
+
+  let targetItem = null;
+  let closestDist = (st.set.ringSize || 48);
+  const items = grid.querySelectorAll('.it');
+
+  items.forEach(el => {
+    const r = el.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (d < closestDist) {
+      closestDist = d;
+      targetItem = el;
+    }
+  });
+
+  if (targetItem !== lastHoveredItem) {
+    if (lastHoveredItem) lastHoveredItem.classList.remove('drag-over');
+    lastHoveredItem = targetItem;
+    if (targetItem) {
+      targetItem.classList.add('drag-over');
+      haptic();
+    }
+  }
+});
+
+fab.addEventListener('pointerup', e => {
+  if (!fbDrag) return;
+  fbDrag = false;
+  dtRing.style.display = 'none';
+  if (lastHoveredItem) {
+    const it = st.items.find(x => x.id === lastHoveredItem.dataset.id);
+    lastHoveredItem.classList.remove('drag-over');
+    lastHoveredItem = null;
+    if (it) launch(it);
+  }
+});
+
+/* ───────── Execution Workflow ───────── */
+function launch(it) {
+  closePop();
+  if (it.t === 'system') {
+    const act = SYS[it.v];
+    if (act && act.run) act.run();
+    else toast(`Toggled ${it.n}`);
+    return;
+  }
+  if (it.v.startsWith('http://') || it.v.startsWith('https://')) {
+    window.open(it.v, '_blank');
+  } else {
+    toast(`Executed intent: ${it.v}`);
+  }
+}
+
+/* ───────── Edit Mode & Drag Logic ───────── */
+let editMode = false;
+fabEdit.onclick = () => {
+  editMode = !editMode;
+  pop.classList.toggle('edit', editMode);
+  fabEdit.classList.toggle('on', editMode);
+  if (editMode) fabAdd.classList.add('open', 'show');
+  else fabAdd.classList.remove('open', 'show');
+  renderGrid();
+  placePop();
+};
+
+grid.addEventListener('click', e => {
+  const addBtn = e.target.closest('.cell-add');
+  if (addBtn) {
+    const s = parseInt(addBtn.closest('.grid-cell').dataset.slot, 10);
+    openDlg(null, s);
+    return;
+  }
+  const itEl = e.target.closest('.it');
+  if (!itEl) return;
+  const item = st.items.find(x => x.id === itEl.dataset.id);
+  if (!item) return;
+
+  if (e.target.closest('.x')) {
+    st.items = st.items.filter(x => x.id !== item.id);
+    saveState();
+    renderGrid();
+    return;
+  }
+
+  if (editMode) openDlg(item, item.slot);
+  else launch(item);
+});
+
+/* ───────── Dialog Form ───────── */
+let dState = null;
+function openDlg(item, slot) {
+  dState = item ? { ...item } : { id: null, slot, t: 'web', n: '', v: '', i: 'fa-solid fa-globe', c: '#4aa3ff' };
+  $('#dT').textContent = item ? 'Update Shortcut' : 'Create Shortcut';
+  $('#dName').value = dState.n;
+  $('#dTarget').value = dState.v;
+  $('#dDel').style.display = item ? 'block' : 'none';
+
+  $('#dType').innerHTML = Object.keys(TYPES).map(k => `
+    <button data-t="${k}" class="${dState.t === k ? 'on' : ''}">${TYPES[k].label}</button>
+  `).join('');
+
+  $('#dIcons').innerHTML = ICONS.map(i => `
+    <button data-i="${i}" class="${dState.i === i ? 'on' : ''}"><i class="${i}"></i></button>
+  `).join('');
+
+  $('#dlg').style.display = 'flex';
+}
+
+$('#dType').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  dState.t = b.dataset.t;
+  $('#dType').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+};
+
+$('#dIcons').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  dState.i = b.dataset.i;
+  $('#dIcons').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+};
+
+$('#dCancel').onclick = () => { $('#dlg').style.display = 'none'; };
+$('#dDel').onclick = () => {
+  if (dState.id) {
+    st.items = st.items.filter(x => x.id !== dState.id);
+    saveState();
+    renderGrid();
+  }
+  $('#dlg').style.display = 'none';
+};
+
+$('#dSave').onclick = () => {
+  const n = $('#dName').value.trim();
+  const v = $('#dTarget').value.trim();
+  if (!n || !v) { toast('Please complete all fields'); return; }
+
+  dState.n = n;
+  dState.v = v;
+
+  if (dState.id) {
+    const idx = st.items.findIndex(x => x.id === dState.id);
+    if (idx !== -1) st.items[idx] = dState;
+  } else {
+    dState.id = uid();
+    st.items.push(dState);
+  }
+  saveState();
+  renderGrid();
+  $('#dlg').style.display = 'none';
+};
+
+/* ───────── Configuration Panel ───────── */
+$('#openStudioBtn').onclick = () => openStudio();
+fabSet.onclick = () => openStudio();
+$('#stDoneBtn').onclick = () => { $('#studio').classList.remove('on'); };
+
+let activeTab = 'general';
+function openStudio() {
+  closePop();
+  $('#studio').classList.add('on');
+  renderStudioBody();
+}
+
+$('#stTabs').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  activeTab = b.dataset.t;
+  $('#stTabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  renderStudioBody();
+};
+
+function renderStudioBody() {
+  const body = $('#stBody');
+  if (activeTab === 'general') {
+    body.innerHTML = `
+      <div class="set-card">
+        <div class="set-hdr"><i class="fa-solid fa-sliders"></i> Master Settings</div>
+        <div class="sw">
+          <span>Haptic Response</span>
+          <button class="tg ${st.set.haptic ? 'on' : ''}" id="stTogHaptic"></button>
+        </div>
+        <div class="sw">
+          <span>Show Label Captions</span>
+          <button class="tg ${st.set.showLbl ? 'on' : ''}" id="stTogLbl"></button>
+        </div>
+      </div>
+      <div class="set-card">
+        <div class="set-hdr"><i class="fa-solid fa-file-export"></i> State Persistence</div>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <button class="sbtn" id="stExport">Export Backup JSON</button>
+          <button class="sbtn" id="stReset">Reset Defaults</button>
+        </div>
+      </div>`;
+    
+    $('#stTogHaptic').onclick = function() {
+      st.set.haptic = !st.set.haptic;
+      this.classList.toggle('on', st.set.haptic);
+      saveState();
+    };
+    $('#stTogLbl').onclick = function() {
+      st.set.showLbl = !st.set.showLbl;
+      this.classList.toggle('on', st.set.showLbl);
+      applySet();
+      saveState();
+    };
+    $('#stExport').onclick = () => {
+      const blob = new Blob([JSON.stringify(st, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'quick_launcher_export.json';
+      a.click();
+    };
+    $('#stReset').onclick = () => {
+      st.set = { ...S_DEF };
+      saveState();
+      applySet();
+      positionFab();
+      toast('Reset to default values');
+    };
+    return;
+  }
+
+  if (activeTab === 'items') {
+    body.innerHTML = `
+      <div class="set-card">
+        <div class="set-hdr"><i class="fa-solid fa-list"></i> Managed Shortcuts</div>
+        ${st.items.map(it => `
+          <div class="res">
+            <div class="ic" style="background:${it.c || '#5b8def'}"><i class="${it.i}"></i></div>
+            <div class="tx"><b>${esc(it.n)}</b><small>${esc(it.v)}</small></div>
+            <button class="pin dl" data-del="${it.id}"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `).join('')}
+      </div>`;
+
+    body.onclick = e => {
+      const delBtn = e.target.closest('[data-del]');
+      if (!delBtn) return;
+      st.items = st.items.filter(x => x.id !== delBtn.dataset.del);
+      saveState();
+      renderStudioBody();
+    };
+    return;
+  }
+
+  const map = {
+    grid: ['cols', 'rows', 'cgap', 'rgap', 'pad'],
+    icons: ['icon', 'radius', 'lbl'],
+    popup: ['w', 'h', 'glass', 'popRad', 'blur'],
+    trigger: ['trigH', 'trigW', 'trigY'],
+    ring: ['ringSize', 'ringThick', 'ringOpacity']
+  };
+
+  const keys = map[activeTab] || [];
+  body.innerHTML = `
+    <div class="set-card">
+      <div class="set-hdr"><i class="fa-solid fa-pen-ruler"></i> Properties</div>
+      ${keys.map(k => {
+        const c = CTRL.find(x => x[0] === k);
+        if (!c) return '';
+        return `
+          <div class="sg">
+            <div class="row"><span>${c[1]}</span><span id="v_${k}">${st.set[k]}${c[5]}</span></div>
+            <input type="range" data-k="${k}" min="${c[2]}" max="${c[3]}" step="${c[4]}" value="${st.set[k]}">
+          </div>`;
+      }).join('')}
+    </div>`;
+
+  body.oninput = e => {
+    const r = e.target.closest('input[type=range]');
+    if (!r) return;
+    const k = r.dataset.k;
+    st.set[k] = parseFloat(r.value);
+    const c = CTRL.find(x => x[0] === k);
+    $(`#v_${k}`).textContent = st.set[k] + (c[5] || '');
+    applySet();
+    positionFab();
+    saveState();
+  };
+}
+
+/* ───────── Batch Import ───────── */
+$('#dBatchBtn').onclick = () => {
+  $('#dlg').style.display = 'none';
+  $('#batchDlg').style.display = 'flex';
+  const list = $('#batchAppList');
+  list.innerHTML = INSTALLED.map(app => `
+    <div class="res batch-row" data-n="${esc(app.n)}" data-v="${esc(app.v)}" data-i="${esc(app.i)}" data-c="${esc(app.c)}">
+      <div class="ic" style="background:${app.c}"><i class="${app.i}"></i></div>
+      <div class="tx"><b>${esc(app.n)}</b><small>${esc(app.v)}</small></div>
+      <input type="checkbox" style="width:18px;height:18px">
+    </div>
+  `).join('');
+};
+
+$('#batchCancel').onclick = () => { $('#batchDlg').style.display = 'none'; };
+$('#batchAddBtn').onclick = () => {
+  const checks = document.querySelectorAll('#batchAppList .batch-row');
+  let count = 0;
+  checks.forEach(row => {
+    if (row.querySelector('input').checked) {
+      const taken = new Set(st.items.map(x => x.slot));
+      let s = 0;
+      while (taken.has(s)) s++;
+      st.items.push({
+        id: uid(),
+        t: 'app',
+        n: row.dataset.n,
+        v: row.dataset.v,
+        i: row.dataset.i,
+        c: row.dataset.c,
+        slot: s
+      });
+      count++;
+    }
+  });
+  saveState();
+  renderGrid();
+  $('#batchDlg').style.display = 'none';
+  toast(`Added ${count} shortcuts`);
+};
+
+/* ───────── Global Listeners ───────── */
+window.addEventListener('resize', () => {
+  applySet();
+  positionFab();
+  if (pop.classList.contains('open')) placePop();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closePop();
+    $('#studio').classList.remove('on');
+    $('.dlgw[style*="flex"]')?.setAttribute('style', 'display:none');
+  }
+});
+
+// Initialization
+applySet();
+positionFab();
+renderGrid();
+})();
+</script>
+</body>
+</html>
